@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f4ec">
+  <meta name="description" content="小麦土柱实验的传感器监测、浇水记录与有机碳计算演示。">
+  <title>小麦土柱实验台</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="experiment.js"></script>
+  <script defer src="analysis.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap top-inner">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">✳</span><span>小麦土柱实验台</span></div>
+      <nav aria-label="实验功能">
+        <button class="nav-button active" data-page="monitor" aria-current="page">实时监测</button>
+        <button class="nav-button" data-page="irrigation">浇水记录</button>
+        <button class="nav-button" data-page="carbon">碳指标</button>
+        <button class="nav-button" data-page="analysis">AI 分析</button>
+      </nav>
+      <button class="mode" id="toggle-run" aria-pressed="true"><span class="dot"></span><span id="mode-label">模拟采集中</span><span id="mode-icon" aria-hidden="true">Ⅱ</span></button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero" aria-labelledby="main-title">
+      <div class="hero-content">
+        <p class="hero-label"><span></span> 小麦种植 · 有机碳实验</p>
+        <h1 id="main-title">土柱实验监测</h1>
+        <p>跟踪不同土层在灌溉前后的水分和 CO₂ 变化。<br>记录浇水与化验结果，计算土柱有机碳变化。</p>
+        <span class="hero-mode">课程作业演示 · 模拟数据</span>
+      </div>
+      <canvas class="soil-illustration" id="soil-illustration" role="img" aria-label="小麦土柱剖面，10 厘米布置水分、温度、电导率及 CO₂ 探头，25 厘米布置水分、温度及电导率探头"></canvas>
+    </section>
+
+    <div class="context-bar">
+      <div class="context-column"><label for="column-select">实验土柱</label><select id="column-select"></select></div>
+      <p class="sample-info" id="sample-info">每 5 秒模拟一次采样（实验时间推进 5 分钟）</p>
+    </div>
+
+    <section id="monitor" class="page" aria-label="实时监测">
+      <section class="card overview" aria-labelledby="overview-title">
+        <div class="card-heading"><div><h2 id="overview-title">土柱总览</h2><p id="overview-description">15 个土柱 · 3 种基质 · 每种 5 柱</p></div><span class="overview-summary" id="overview-summary"></span></div>
+        <div class="overview-groups" id="overview-groups"></div>
+      </section>
+      <div class="metrics" id="metrics"></div>
+      <div class="dashboard">
+        <section class="card chart-card" aria-labelledby="trend-title">
+          <div class="card-heading"><div><h2 id="trend-title">传感器趋势</h2><p id="trend-subtitle">浅层和深层含水率</p></div><label class="visually-hidden" for="time-window">时间范围</label><select id="time-window"><option value="180">最近 3 小时</option><option value="60">最近 1 小时</option><option value="360">最近 6 小时</option></select></div>
+          <div class="chart-controls" id="chart-controls" aria-label="传感器指标"></div>
+          <div class="chart-shell"><canvas id="trend-chart" role="img" aria-label="传感器历史曲线"></canvas><output id="chart-tip" hidden></output></div>
+          <div class="legend" id="legend"></div>
+        </section>
+        <aside class="card watering-card" aria-labelledby="water-title">
+          <div class="card-heading"><div><h2 id="water-title">浇水提醒</h2><p>按当前土柱的水分方案判断</p></div><button id="edit-rule" class="subtle-button" type="button">设置</button></div>
+          <div id="water-status" aria-live="polite"></div>
+          <div class="rule-list" id="rule-summary"></div>
+          <button type="button" class="primary-button log-trigger">＋ 记录浇水</button>
+        </aside>
+      </div>
+    </section>
+
+    <section id="analysis" class="page" aria-labelledby="analysis-title" hidden>
+      <section class="card content-card analysis-card">
+        <div class="card-heading">
+          <div><h2 id="analysis-title">土柱状况分析</h2><p>用最新读数、近 1 小时变化和浇水记录检查当前状况。</p></div>
+          <span class="connection-badge" id="analysis-connection">检查分析接口…</span>
+        </div>
+        <form id="analysis-form" class="analysis-controls">
+          <label for="analysis-scope">分析范围</label>
+          <select id="analysis-scope"><option value="all">全部 15 柱</option><option value="selected" id="analysis-current">当前土柱</option></select>
+          <button class="primary-button" type="submit">分析当前状况</button>
+        </form>
+        <p class="hint" id="analysis-hint"></p>
+        <p class="analysis-message" id="analysis-state" role="status">选择范围后开始分析。</p>
+        <div id="analysis-results" hidden>
+          <div class="analysis-summary">
+            <p class="analysis-meta" id="analysis-meta"></p>
+            <h3 id="analysis-headline"></h3>
+            <ul id="analysis-findings"></ul>
+          </div>
+          <div class="table-scroll"><table class="analysis-table">
+            <thead><tr><th>基质</th><th>柱数</th><th>10 cm 含水率</th><th>25 cm 含水率</th><th>10 cm CO₂</th><th>浅层含水率 1 小时变化</th><th>浅层 CO₂ 1 小时变化</th></tr></thead>
+            <tbody id="analysis-groups"></tbody>
+          </table></div>
+          <p class="hint">表内为所选范围的均值。变化量为当前读数减去 1 小时前的读数。</p>
+          <section id="model-result" class="model-result" hidden><h3>模型解读</h3><p id="model-text"></p></section>
+        </div>
+      </section>
+    </section>
+
+    <section id="irrigation" class="page" aria-label="浇水记录" hidden>
+      <section class="card content-card">
+        <div class="card-heading"><div><h2>浇水记录</h2><p>按土柱查看浇水量，以及浇水前后各 1 小时的变化。</p></div><button class="primary-button log-trigger" type="button">＋ 记录浇水</button></div>
+        <div class="table-scroll"><table><thead><tr><th>实验时间</th><th>浇水量</th><th>浅层含水率平均变化</th><th>浅层 CO₂ 平均变化</th><th>浇水后 1 小时 CO₂ 峰值</th><th>备注</th></tr></thead><tbody id="water-history"></tbody></table></div>
+        <p class="hint">连续记录满 1 小时后显示结果。前后窗口均需要完整的 5 分钟采样记录。</p>
+      </section>
+    </section>
+
+    <section id="carbon" class="page" aria-label="碳指标" hidden>
+      <div class="carbon-layout">
+        <section class="card content-card">
+          <div class="card-heading"><div><h2>土壤有机碳存量</h2><p>各层 SOC 含量乘以对应干土质量，再加总为整柱存量。</p></div></div>
+          <form id="soc-form">
+            <div class="table-scroll"><table><thead><tr><th>土层</th><th>播前 SOC<br>g C/kg</th><th>播前干土<br>kg</th><th>收获 SOC<br>g C/kg</th><th>收获干土<br>kg</th></tr></thead><tbody id="soc-rows"></tbody></table></div>
+            <div class="result-strip" id="soc-results"></div>
+          </form>
+          <p class="hint">存量变化取收获后存量减去播种前存量。所有数值均可替换为化验数据。</p>
+        </section>
+        <section class="card content-card">
+          <div class="card-heading"><div><h2>排水溶解性有机碳</h2><p>每次排水 DOC 浓度 × 排水体积。</p></div></div>
+          <form id="doc-form" class="doc-form">
+            <label>DOC 浓度（mg C/L）<input type="number" name="concentration" min="0" step="any" placeholder="20" required></label>
+            <label>水量（L）<input type="number" name="volume" min="0.001" step="any" placeholder="0.50" required></label>
+            <button class="primary-button" type="submit">添加</button>
+          </form>
+          <div class="table-scroll"><table><thead><tr><th>浓度</th><th>水量</th><th>有机碳</th></tr></thead><tbody id="doc-rows"></tbody></table></div>
+          <div class="result-strip" id="doc-total"></div>
+        </section>
+        <section class="card content-card">
+          <div class="card-heading"><div><h2>实验室 pH</h2><p>同一土层用相同方法测定播种前及收获后的 pH。</p></div></div>
+          <form id="ph-form"><div class="table-scroll"><table><thead><tr><th>土层</th><th>播种前</th><th>收获后</th><th>变化（pH 单位）</th></tr></thead><tbody id="ph-rows"></tbody></table></div></form>
+        </section>
+      </div>
+    </section>
+
+    <footer><span>小麦土柱 · 课程作业</span><span>浇水及化验记录保存在当前浏览器</span></footer>
+  </main>
+
+  <dialog id="log-dialog" aria-labelledby="log-title">
+    <form id="log-form" class="dialog-form">
+      <div class="card-heading"><div><h2 id="log-title">记录浇水</h2><p id="log-column"></p></div><button type="button" class="subtle-button close-dialog" aria-label="关闭">✕</button></div>
+      <label>实际水量（mL）<input name="amount" type="number" min="1" step="any" placeholder="例如 150" required></label>
+      <label>备注<textarea name="note" rows="2" maxlength="100" placeholder="例如 按方案补水"></textarea></label>
+      <p class="hint">记录当前模拟时刻，曲线上会标出本次浇水。</p>
+      <div class="dialog-actions"><button type="button" class="subtle-button close-dialog">取消</button><button type="submit" class="primary-button">保存记录</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="rule-dialog" aria-labelledby="rule-title">
+    <form id="rule-form" class="dialog-form">
+      <div class="card-heading"><div><h2 id="rule-title">浇水提醒设置</h2><p id="rule-column"></p></div><button type="button" class="subtle-button close-dialog" aria-label="关闭">✕</button></div>
+      <label>提醒方式<select name="type"><option value="threshold">低于含水率下限</option><option value="scheduled">固定时刻（每日）</option></select></label>
+      <div id="threshold-fields" class="form-pair">
+        <label>探头深度<select name="depth"><option value="0">10 cm</option><option value="1">25 cm</option></select></label>
+        <label>含水率下限（%）<input name="threshold" type="number" min="1" max="80" step="0.1" required></label>
+      </div>
+      <div id="schedule-fields" class="form-pair" hidden>
+        <label>每日浇水时间<input name="time" type="time" required></label>
+        <label>计划水量（mL）<input name="amount" type="number" min="1" step="any" required></label>
+      </div>
+      <p class="hint">阈值供演示，可按实际土壤和实验条件调整。每种处理的设置单独保存。</p>
+      <div class="dialog-actions"><button type="button" class="subtle-button close-dialog">取消</button><button type="submit" class="primary-button">保存设置</button></div>
+    </form>
+  </dialog>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
+
+
+
